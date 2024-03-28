@@ -118,7 +118,7 @@ class classification:
     ### Random Forest
     def run_rf(self, explain = True,para=None):
         print('---runing Random forest---')
-        for config_use in self.config['logistic regression'].keys():
+        for config_use in self.config['RFC'].keys():
             
             para = self.config['RFC'][config_use]
             self.rf = RandomForestClassifier(**para['config'])

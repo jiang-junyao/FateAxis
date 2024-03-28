@@ -14,4 +14,4 @@ adata_use = adata[adata.obs.celltype.isin(['5','0'])]
 
 fsn = clf.classification(adata_use.X, adata_use.obs.celltype)
 print(fsn.config.keys())
-fsn.run_gbm()
+fsn.run_rf()
