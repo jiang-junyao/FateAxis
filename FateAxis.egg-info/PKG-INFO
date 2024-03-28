@@ -1,0 +1,14 @@
+Metadata-Version: 2.1
+Name: FateAxis
+Version: 0.0.1
+Summary: Identification of Key Regulatory Relationships Governing             Cell State Transitions from scMultiomics Data using AutoML
+Home-page: https://github.com/jiang-junyao/FateAxis
+Author: Junyao Jiang
+Author-email: jyjiang@link.cuhk.edu.hk
+License: UNKNOWN
+Platform: UNKNOWN
+Requires-Python: >=3.6
+License-File: LICENSE
+
+UNKNOWN
+

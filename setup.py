@@ -1,9 +1,9 @@
-from setuptools import setup, find_packages
+import setuptools
 
-setup(
-    name = "packaging_tutorial",
-    version = "0.1",
-    packages = find_packages(),
+setuptools.setup(
+    name = "FateAxis",
+    version = "v0.0.1",
+    packages = setuptools.find_packages(),
     # Metadata
     url = "https://github.com/jiang-junyao/FateAxis",
     author = "Junyao Jiang",

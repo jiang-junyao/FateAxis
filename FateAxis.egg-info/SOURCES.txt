@@ -1,0 +1,16 @@
+.gitattributes
+.gitignore
+LICENSE
+README.md
+setup.py
+FateAxis/__init__.py
+FateAxis.egg-info/PKG-INFO
+FateAxis.egg-info/SOURCES.txt
+FateAxis.egg-info/dependency_links.txt
+FateAxis.egg-info/top_level.txt
+FateAxis/model/__init__.py
+FateAxis/model/clf.py
+FateAxis/test/__init__.py
+FateAxis/test/test_clf.py
+FateAxis/tool/__init__.py
+FateAxis/tool/io_tool.py
