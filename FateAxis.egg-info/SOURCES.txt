@@ -8,8 +8,11 @@ FateAxis.egg-info/PKG-INFO
 FateAxis.egg-info/SOURCES.txt
 FateAxis.egg-info/dependency_links.txt
 FateAxis.egg-info/top_level.txt
+FateAxis/config/config1.js
 FateAxis/model/__init__.py
 FateAxis/model/clf.py
+FateAxis/model/__pycache__/__init__.cpython-310.pyc
+FateAxis/model/__pycache__/classcification.cpython-310.pyc
 FateAxis/test/__init__.py
 FateAxis/test/test_clf.py
 FateAxis/tool/__init__.py

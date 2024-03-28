@@ -11,6 +11,9 @@ setuptools.setup(
     description = "Identification of Key Regulatory Relationships Governing \
             Cell State Transitions from scMultiomics Data using AutoML",
     python_requires = ">=3.6",
-    include_package_data = True
+    include_package_data = True,
+    package_data = {'': [
+        'config/*',
+    ]}
     #...
 )
