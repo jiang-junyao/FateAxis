@@ -1052,14 +1052,28 @@
             "config": {
                 "n_estimators": 100,
                 "criterion": "entropy",
-                "max_features": "auto"
+                "max_features": "sqrt"
             }
         },
         "sklearn_rfc_1": {
             "config": {
                 "n_estimators": 100,
                 "criterion": "gini",
-                "max_features": "auto"
+                "max_features": "sqrt"
+            }
+        },
+        "sklearn_rfc_2": {
+            "config": {
+                "n_estimators": 100,
+                "criterion": "entropy",
+                "max_features": "log2"
+            }
+        },
+        "sklearn_rfc_3": {
+            "config": {
+                "n_estimators": 100,
+                "criterion": "gini",
+                "max_features": "log2"
             }
         }
     },

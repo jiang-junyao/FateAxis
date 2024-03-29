@@ -22,7 +22,21 @@ from scipy.special import softmax
 import pandas as pd
 import numpy as np
 from sklearn.metrics import roc_auc_score
+from torch.utils.data import Dataset, DataLoader
 
+class MyDataset(Dataset):
+    def __init__(self, data, targets):
+        self.data = data
+        self.targets = targets
+
+    def __getitem__(self, index):
+        x = self.data[index]
+        y = self.targets[index]
+        return x, y
+
+    def __len__(self):
+        return len(self.data)
+    
 class classification:
     def __init__(self,
                  input_mt,
@@ -45,6 +59,13 @@ class classification:
         config_path = pkg_resources.resource_filename('FateAxis', 
                                                       'config/config1.js')
         self.config = io_use.read_json(config_path)
+        
+        # dataloader used for torch
+        train_data = MyDataset(self.x_train, self.y_train)
+        test_data = MyDataset(self.x_test, self.y_test)
+        train_loader = DataLoader(train_data, batch_size=32, shuffle=True)
+        test_loader = DataLoader(test_data, batch_size=32, shuffle=False)
+    
     ### xgb
     def run_gbm(self, explain = True,para=None):
         print('---runing xgboost---')
@@ -137,7 +158,7 @@ class classification:
                 shap_val = explainer_rf.shap_values(self.input_mt[idx])
                 if len(shap_val)>2:
                     shap_val = np.array(shap_val).sum(axis=2)
-                self.shap_value[config_use] = loss*(self.__min_max_scaling(shap_val.mean(axis=0)))
+                self.shap_value[config_use] = loss*(self.__min_max_scaling(np.abs(shap_val).mean(axis=0)))
 
         
     def __min_max_scaling(self,arr):

@@ -1046,6 +1046,27 @@
                 "probability": true
             }
         }
+    "SVM": {
+        "sklearn_svc_2": {
+            "config": {
+                "kernel": "linear",
+                "gamma": "auto",
+                "C": 1.0,
+                "degree": 0,
+                "cache_size": 500,
+                "probability": true
+            }
+        },
+        "sklearn_svc_3": {
+            "config": {
+                "kernel": "linear",
+                "gamma": "scale",
+                "C": 1.0,
+                "degree": 0,
+                "cache_size": 500,
+                "probability": true
+            }
+        }
     },
     "RFC": {
         "sklearn_rfc_0": {
@@ -1061,7 +1082,7 @@
                 "criterion": "gini",
                 "max_features": "sqrt"
             }
-        },
+        }
         "sklearn_rfc_2": {
             "config": {
                 "n_estimators": 100,
@@ -1074,6 +1095,20 @@
                 "n_estimators": 100,
                 "criterion": "gini",
                 "max_features": "log2"
+            }
+        }
+        "sklearn_rfc_4": {
+            "config": {
+                "n_estimators": 100,
+                "criterion": "entropy",
+                "max_features": None
+            }
+        },
+        "sklearn_rfc_5": {
+            "config": {
+                "n_estimators": 100,
+                "criterion": "gini",
+                "max_features": None
             }
         }
     },
