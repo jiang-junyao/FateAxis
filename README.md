@@ -3,4 +3,5 @@
 
 # Install
 git clone https://github.com/jiang-junyao/FateAxis.git
+
 pip install .
