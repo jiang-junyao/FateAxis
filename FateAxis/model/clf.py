@@ -3,7 +3,6 @@ from sklearn import svm
 from sklearn.svm import SVC
 from xgboost import XGBClassifier
 from sklearn import preprocessing
-from sklearn.model_selection import GridSearchCV
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
@@ -24,6 +23,11 @@ import numpy as np
 from sklearn.metrics import roc_auc_score
 from torch.utils.data import Dataset, DataLoader
 
+### DL module
+from FateAxis.tool import dl_trainer
+from FateAxis.model import cnn_1d
+
+
 class MyDataset(Dataset):
     def __init__(self, data, targets):
         self.data = data
@@ -42,11 +46,15 @@ class classification:
                  input_mt,
                  label,
                  split_size = 0.3,
+                 dl_epoch = 4,
+                 device='gpu',
                  core_num = 30):
         le = preprocessing.LabelEncoder()
         self.org_label = label
         self.label = le.fit_transform(label)
         self.input_mt = input_mt
+        self.dl_epoch = dl_epoch
+        self.device = device
         self.core_num = core_num
         self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(input_mt, 
                                                                                 self.label,
@@ -60,11 +68,13 @@ class classification:
                                                       'config/config1.js')
         self.config = io_use.read_json(config_path)
         
-        # dataloader used for torch
-        train_data = MyDataset(self.x_train, self.y_train)
-        test_data = MyDataset(self.x_test, self.y_test)
-        train_loader = DataLoader(train_data, batch_size=32, shuffle=True)
-        test_loader = DataLoader(test_data, batch_size=32, shuffle=False)
+        # dataset used for torch
+        self.train_data = MyDataset(self.x_train, self.y_train)
+        self.test_data = MyDataset(self.x_test, self.y_test)
+        
+        # data for explain
+        
+
     
     ### xgb
     def run_gbm(self, explain = True,para=None):
@@ -159,7 +169,43 @@ class classification:
                 if len(shap_val)>2:
                     shap_val = np.array(shap_val).sum(axis=2)
                 self.shap_value[config_use] = loss*(self.__min_max_scaling(np.abs(shap_val).mean(axis=0)))
+                
+    ### 1D CNN
+    def run_cnn1d(self,explain=True):
+        
+        print('---runing CNN1D---')
+        
+        for config_use in self.config['CNN_1D'].keys():
+            print(config_use)
+            if self.config['CNN_1D'][config_use]['config']['num_layers'] < 3:
+                model = cnn_1d.Limited(config_use, 
+                                self.config['CNN_1D'][config_use]['config'])
+            else:
+                model = cnn_1d.Unlimited(config_use, 
+                                self.config['CNN_1D'][config_use]['config'])
 
+            batch_size = self.config['CNN_1D'][config_use]['batch_size']
+            
+            train_loader = DataLoader(self.train_data, batch_size=batch_size, 
+                                      shuffle=True)
+            test_loader = DataLoader(self.test_data, batch_size=batch_size, 
+                                     shuffle=False)
+
+            Trainer = dl_trainer.torch_trainer(model,device=self.device)
+            Trainer.fit(train_loader,self.dl_epoch)
+            loss,acc = Trainer.evaluate(test_loader)
+            self.model_acc[config_use] = acc
+            self.model_loss[config_use] = loss
+            print('acc:'+str(acc))
+            print('loss:'+str(loss))
+            if explain:
+                X = torch.from_numpy(self.input_mt).float()
+                y = torch.from_numpy(self.label).long()
+                data = MyDataset(X, y)
+                shap_loader = DataLoader(data, batch_size=batch_size, shuffle=False)
+                shap_score = Trainer.explain(shap_loader,X)
+                self.shap_value[config_use] = shap_score
+            
         
     def __min_max_scaling(self,arr):
 

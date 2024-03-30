@@ -9,7 +9,7 @@
                 "num_layers": 2,
                 "learning_rate": 0.1
             },
-            "epoch": 2,
+            "epoch": 4,
             "batch_size": 10
         },
         "pytorch_cnn_1d_1": {
@@ -21,7 +21,7 @@
                 "num_layers": 2,
                 "learning_rate": 0.1
             },
-            "epoch": 2,
+            "epoch": 4,
             "batch_size": 5
         },
         "pytorch_cnn_1d_2": {
@@ -33,7 +33,7 @@
                 "num_layers": 1,
                 "learning_rate": 0.1
             },
-            "epoch": 2,
+            "epoch": 4,
             "batch_size": 10
         },
         "pytorch_cnn_1d_3": {

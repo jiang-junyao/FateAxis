@@ -9,7 +9,6 @@ import itertools
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
-import ageas.classifier as classifier
 
 
 
@@ -62,13 +61,13 @@ class Limited(nn.Module):
 
     # Overwrite the forward function in nn.Module
     def forward(self, input):
+
         input = self.pool(F.relu(self.conv(input)))
         if self.num_layers > 1:
             input = self.pool1(F.relu(self.conv1(input)))
         if self.num_layers > 2:
             input = self.pool2(F.relu(self.conv2(input)))
-        if self.num_layers > 3:
-            raise classifier.Error('CNN Model with more than 3 layer sets')
+ 
         input = torch.flatten(input, start_dim = 1)
         input = F.relu(self.dense(input))
         input = F.softmax(self.decision(input), dim = 1)
@@ -121,28 +120,3 @@ class Unlimited(nn.Module):
 
 
 
-class Make(classifier.Make_Template):
-    """
-    Analysis the performances of CNN based approaches
-    with different hyperparameters
-    Find the top settings to build CNN
-    """
-
-    # Perform classifier training process for given times
-    def train(self, dataSets, test_split_set):
-        num_features = len(dataSets.dataTest[0])
-        for id in self.configs:
-            if self.configs[id]['config']['num_layers'] < 3:
-                model = Limited(id, self.configs[id]['config'])
-            else:
-                model = Unlimited(id, self.configs[id]['config'])
-            epoch = self.configs[id]['epoch']
-            batch_size = self.configs[id]['batch_size']
-            self._train_torch(epoch, batch_size, model, dataSets)
-            model_recod = self._evaluate_torch(
-                model,
-                dataSets.dataTest,
-                dataSets.labelTest,
-                test_split_set
-            )
-            self.models.append(model_recod)

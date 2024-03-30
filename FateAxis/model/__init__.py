@@ -24,18 +24,21 @@ class torch_trainer():
         self.model = model
         if device=='gpu' and torch.cuda.is_available():
             device = torch.device('cuda')
+            print('GPU lanuch!')
         else:
             device = torch.device('cpu')
+            print('only using CPU to train DL model~~~')
 
         
-    def fit(self,train_loader,):
+    def fit(self,train_loader, total_epoch=4):
         
         optimizer = optim.Adam(self.model.parameters(), lr=0.001)
         scheduler = CosineAnnealingLR(optimizer, T_max=10, eta_min=0)
         criterion = nn.CrossEntropyLoss()
         
-        for epoch in range(10):  # 10个epoch
+        for epoch in range(total_epoch):
             for batch_idx, (data, target) in enumerate(train_loader):
+                data = data.squeeze()
                 optimizer.zero_grad()
                 output = self.model(data)
                 loss = criterion(output, target)
@@ -43,7 +46,7 @@ class torch_trainer():
                 optimizer.step()
             scheduler.step()
             
-    def evaluate(self, test_loader, return_idx):
+    def evaluate(self, test_loader):
         
         self.model.eval()
         test_loss = 0
@@ -77,4 +80,5 @@ class torch_trainer():
         explainer = shap.DeepExplainer(self.model, data_for_shap)
         shap_values = explainer.shap_values(data_for_shap)
         score = test_loss*(self.__min_max_scaling(np.abs(shap_values)))
-        return test_loss,score
+        
+        return score

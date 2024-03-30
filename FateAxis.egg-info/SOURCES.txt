@@ -21,4 +21,5 @@ FateAxis/model/__pycache__/classcification.cpython-310.pyc
 FateAxis/test/__init__.py
 FateAxis/test/test_clf.py
 FateAxis/tool/__init__.py
+FateAxis/tool/dl_trainer.py
 FateAxis/tool/io_tool.py
