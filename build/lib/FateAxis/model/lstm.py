@@ -12,7 +12,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
-import ageas.classifier as classifier
+
 
 
 
@@ -21,6 +21,7 @@ class LSTM(nn.Module):
     Recurrent neural network (many-to-one)
     """
     def __init__(self,
+                 device,
                  id,
                  input_size,
                  num_layers,
@@ -33,6 +34,7 @@ class LSTM(nn.Module):
                  proj_size = 0,
                 ):
         super(LSTM, self).__init__()
+        self.device=device
         self.id = id
         self.model_type = 'LSTM'
         self.num_layers = num_layers
@@ -56,6 +58,8 @@ class LSTM(nn.Module):
         # Set initial hidden and cell states
         h0 = torch.zeros(self.num_layers, input.size(0), self.hidden_size)
         c0 = torch.zeros(self.num_layers, input.size(0), self.hidden_size)
+        h0 = h0.to(self.device)
+        c0 = c0.to(self.device)
         # Forward propagate LSTM
         out, _ = self.lstm(input, (h0, c0))
         # out: tensor of shape (batch_size, seq_length, hidden_size)
@@ -64,25 +68,10 @@ class LSTM(nn.Module):
         return out
 
 
-
-class Make(classifier.Make_Template):
-    """
-    Analysis the performances of LSTM based approaches
-    with different hyperparameters
-    Find the top settings to build LSTM
-    """
-    # Perform classifier training process for given times
-    def train(self, dataSets, test_split_set):
-        num_features = len(dataSets.dataTest[0])
-        for id in self.configs:
-            model = LSTM(id, num_features, **self.configs[id]['config'])
-            epoch = self.configs[id]['epoch']
-            batch_size = self.configs[id]['batch_size']
-            self._train_torch(epoch, batch_size, model, dataSets)
-            model_record = self._evaluate_torch(
-                model,
-                dataSets.dataTest,
-                dataSets.labelTest,
-                test_split_set
-            )
-            self.models.append(model_record)
+    def set_hidden_device(self,device='gpu'):
+        if device=='gpu' and torch.cuda.is_available():
+            self.device = torch.device('cuda')
+            #torch.set_default_tensor_type(torch.cuda.FloatTensor)
+            #print('GPU lanuch!')
+        else:
+            self.device = torch.device('cpu')

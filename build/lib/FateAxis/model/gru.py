@@ -12,12 +12,12 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
-import ageas.classifier as classifier
 
 
 
 class GRU(nn.Module):
     def __init__(self,
+                 device,
                  id,
                  input_size,
                  num_layers,
@@ -29,6 +29,7 @@ class GRU(nn.Module):
                  bidirectional = 'False',
                 ):
         super(GRU, self).__init__()
+        self.device=device
         self.id = id
         self.model_type = 'GRU'
         self.num_layers = num_layers
@@ -51,32 +52,17 @@ class GRU(nn.Module):
         # Set initial hidden states (and cell states for LSTM)
         # input needs to be: (batch_size, seq, input_size)
         h0 = torch.zeros(self.num_layers, input.size(0), self.hidden_size)
+        h0 = h0.to(self.device)
         out, _ = self.gru(input, h0)
         # out: tensor of shape (batch_size, seq_length, hidden_size)
         # Decode the hidden state of the last time step
         out = F.softmax(self.fc(out[:, -1, :]), dim = 1)
         return out
 
-
-
-class Make(classifier.Make_Template):
-    """
-    Analysis the performances of GRU based approaches
-    with different hyperparameters
-    Find the top settings to build GRU
-    """
-    # Perform classifier training process for given times
-    def train(self, dataSets, test_split_set):
-        num_features = len(dataSets.dataTest[0])
-        for id in self.configs:
-            model = GRU(id, num_features, **self.configs[id]['config'])
-            epoch = self.configs[id]['epoch']
-            batch_size = self.configs[id]['batch_size']
-            self._train_torch(epoch, batch_size, model, dataSets)
-            model_record = self._evaluate_torch(
-                model,
-                dataSets.dataTest,
-                dataSets.labelTest,
-                test_split_set
-            )
-            self.models.append(model_record)
+    def set_hidden_device(self,device='gpu'):
+        if device=='gpu' and torch.cuda.is_available():
+            self.device = torch.device('cuda')
+            #torch.set_default_tensor_type(torch.cuda.FloatTensor)
+            #print('GPU lanuch!')
+        else:
+            self.device = torch.device('cpu')

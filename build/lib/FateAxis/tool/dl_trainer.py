@@ -85,12 +85,11 @@ class torch_trainer():
                 
         return test_loss / len(test_loader.dataset),correct / len(test_loader.dataset)
     
-    def explain(self,shap_loader,X,transfer_data=True):
+    def explain(self,shap_loader,X,transfer_data=True,device=None):
         
         self.model.eval()
         correct_pred_index = []
         test_loss = 0
-        
         with torch.no_grad():
             for data, target in shap_loader:
                 if transfer_data:
@@ -105,13 +104,24 @@ class torch_trainer():
                 correct_pred = pred.eq(target.view_as(pred))
                 correct_pred_index.append(correct_pred)
         correct_pred_index = torch.cat(correct_pred_index).nonzero(as_tuple=True)[0].cpu().numpy()
-        data_for_shap = X[correct_pred_index]
+        data_for_shap = X[correct_pred_index[:10]]
         data_for_shap = data_for_shap.to(torch.device('cpu'))
         if transfer_data:
             data_for_shap = data_for_shap.unsqueeze(1)
         self.model.to(torch.device('cpu'))
+        if device == 'cpu':
+            self.model.set_hidden_device(device)
         explainer = shap.DeepExplainer(self.model, data_for_shap)
         shap_values = explainer.shap_values(data_for_shap)
         score = test_loss*(self.__min_max_scaling(np.abs(shap_values)))
         
         return score
+
+            
+    def __min_max_scaling(self,arr):
+
+        min_val = np.min(arr)
+        max_val = np.max(arr)
+        scaled_arr = (arr - min_val) / (max_val - min_val)
+
+        return scaled_arr

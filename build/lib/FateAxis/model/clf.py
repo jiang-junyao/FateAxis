@@ -1,14 +1,10 @@
 from sklearn.ensemble import RandomForestClassifier
-from sklearn import svm
 from sklearn.svm import SVC
 from xgboost import XGBClassifier
 from sklearn import preprocessing
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
-from sklearn.neural_network import MLPClassifier
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.neighbors import KNeighborsClassifier
 import shap
 import scanpy as sc
 import warnings
@@ -26,7 +22,9 @@ from torch.utils.data import Dataset, DataLoader
 ### DL module
 from FateAxis.tool import dl_trainer
 from FateAxis.model import cnn_1d
-
+from FateAxis.model import cnn_hybrid
+from FateAxis.model import gru
+from FateAxis.model import lstm
 
 class MyDataset(Dataset):
     def __init__(self, data, targets):
@@ -202,10 +200,105 @@ class classification:
                 X = torch.from_numpy(self.input_mt).float()
                 y = torch.from_numpy(self.label).long()
                 data = MyDataset(X, y)
-                shap_loader = DataLoader(data, batch_size=batch_size, shuffle=False)
+                shap_loader = DataLoader(data, batch_size=1, shuffle=False)
                 shap_score = Trainer.explain(shap_loader,X)
                 self.shap_value[config_use] = shap_score
+    def run_hybrid(self,explain=True):
+        
+        print('---runing CNNhybrid---')
+        
+        for config_use in self.config['CNN_Hybrid'].keys():
+            print(config_use)
+            model = cnn_hybrid.Limited(config_use, 
+                                self.config['CNN_Hybrid'][config_use]['config'])
+
+
+            batch_size = self.config['CNN_Hybrid'][config_use]['batch_size']
             
+            train_loader = DataLoader(self.train_data, batch_size=batch_size, 
+                                      shuffle=True)
+            test_loader = DataLoader(self.test_data, batch_size=batch_size, 
+                                     shuffle=False)
+
+            Trainer = dl_trainer.torch_trainer(model,device=self.device)
+            Trainer.fit(train_loader,self.dl_epoch,transfer_data=False)
+            loss,acc = Trainer.evaluate(test_loader)
+            self.model_acc[config_use] = acc
+            self.model_loss[config_use] = loss
+            print('acc:'+str(acc))
+            print('loss:'+str(loss))
+            if explain:
+                X = torch.from_numpy(self.input_mt).float()
+                y = torch.from_numpy(self.label).long()
+                data = MyDataset(X, y)
+                shap_loader = DataLoader(data, batch_size=1, shuffle=False)
+                shap_score = Trainer.explain(shap_loader,X)
+                self.shap_value[config_use] = shap_score
+                
+    def run_gru(self,explain=True):
+        
+        print('---runing gru---')
+
+        for config_use in self.config['GRU'].keys():
+            print(config_use)
+            n_fea = self.input_mt.shape[1]
+            model = gru.GRU(self.device,config_use, n_fea,
+                                **self.config['GRU'][config_use]['config'])
+            model.set_hidden_device('gpu')
+            
+            batch_size = self.config['GRU'][config_use]['batch_size']
+            
+            train_loader = DataLoader(self.train_data, batch_size=batch_size, 
+                                      shuffle=True)
+            test_loader = DataLoader(self.test_data, batch_size=batch_size, 
+                                     shuffle=False)
+
+            Trainer = dl_trainer.torch_trainer(model,device=self.device)
+            Trainer.fit(train_loader,self.dl_epoch,transfer_data=True)
+            loss,acc = Trainer.evaluate(test_loader)
+            self.model_acc[config_use] = acc
+            self.model_loss[config_use] = loss
+            print('acc:'+str(acc))
+            print('loss:'+str(loss))
+            if explain:
+                X = torch.from_numpy(self.input_mt).float()
+                y = torch.from_numpy(self.label).long()
+                data = MyDataset(X, y)
+                shap_loader = DataLoader(data, batch_size=1, shuffle=False)
+                shap_score = Trainer.explain(shap_loader,X,device='cpu')
+                self.shap_value[config_use] = shap_score
+
+    def run_lstm(self,explain=True):
+        
+        print('---runing gru---')
+
+        for config_use in self.config['LSTM'].keys():
+            print(config_use)
+            n_fea = self.input_mt.shape[1]
+            model = lstm.LSTM(self.device,config_use,n_fea,
+                                **self.config['LSTM'][config_use]['config'])
+            model.set_hidden_device('gpu')
+            batch_size = self.config['LSTM'][config_use]['batch_size']
+            
+            train_loader = DataLoader(self.train_data, batch_size=batch_size, 
+                                      shuffle=True)
+            test_loader = DataLoader(self.test_data, batch_size=batch_size, 
+                                     shuffle=False)
+
+            Trainer = dl_trainer.torch_trainer(model,device=self.device)
+            Trainer.fit(train_loader,self.dl_epoch,transfer_data=True)
+            loss,acc = Trainer.evaluate(test_loader)
+            self.model_acc[config_use] = acc
+            self.model_loss[config_use] = loss
+            print('acc:'+str(acc))
+            print('loss:'+str(loss))
+            if explain:
+                X = torch.from_numpy(self.input_mt).float()
+                y = torch.from_numpy(self.label).long()
+                data = MyDataset(X, y)
+                shap_loader = DataLoader(data, batch_size=1, shuffle=False)
+                shap_score = Trainer.explain(shap_loader,X,device='cpu')
+                self.shap_value[config_use] = shap_score
         
     def __min_max_scaling(self,arr):
 
