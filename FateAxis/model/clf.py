@@ -12,6 +12,7 @@ import FateAxis.tool.io_tool as io_use
 from sklearn.exceptions import ConvergenceWarning
 import pkg_resources
 warnings.filterwarnings("ignore", category=ConvergenceWarning)
+warnings.filterwarnings('ignore')
 import torch
 from scipy.special import softmax
 import pandas as pd
@@ -46,6 +47,7 @@ class classification:
                  split_size = 0.3,
                  dl_epoch = 4,
                  device='gpu',
+                 feature_name = [],
                  core_num = 30):
         le = preprocessing.LabelEncoder()
         self.org_label = label
@@ -54,6 +56,7 @@ class classification:
         self.dl_epoch = dl_epoch
         self.device = device
         self.core_num = core_num
+        self.feature_name = feature_name
         self.x_train, self.x_test, self.y_train, self.y_test = train_test_split(input_mt, 
                                                                                 self.label,
                                                                                 test_size=split_size, 

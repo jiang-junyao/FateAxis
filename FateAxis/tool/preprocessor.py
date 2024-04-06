@@ -9,7 +9,7 @@ import scanpy as sc
 import pandas as pd
 import pkg_resources
 import numpy as np
-
+import celloracle as co
 class pper:
     def __init__(self,
                  obj,
@@ -18,7 +18,7 @@ class pper:
         
         self.adata = obj
         self.group=group
-
+        self.species=species
         
         ### set tf db
         if species == 'hs':
@@ -67,8 +67,65 @@ class pper:
                        tf_exp_thr]
         
         ### subset the adata
-        final_fea = list(set(differential_genes + selected_tf))
-        self.adata = self.adata[:,final_fea]
+        self.grn_fea = list(set(differential_genes + selected_tf))
+        
+        
+    def run_celloracle(self,adata,baseGRN=None,group='celltype',
+                       embedding_name='X_umap',ncores=10):
+        
+        oracle = co.Oracle()
+        ### use celloracle defualt grn
+        if baseGRN==None & self.species=='hs':
+            baseGRN = co.data.load_human_promoter_base_GRN()
+        elif baseGRN==None & self.species=='mm':
+            baseGRN = co.data.load_mouse_scATAC_atlas_base_GRN()
+            
+        oracle.import_anndata_as_raw_count(adata=adata,
+                                   cluster_column_name=group,
+                                   embedding_name=embedding_name)
+        oracle.import_TF_data(TF_info_matrix=baseGRN)
+        oracle.perform_PCA()
+        n_comps = np.where(np.diff(np.diff(np.cumsum(oracle.pca.explained_variance_ratio_))>0.002))[0][0]
+        n_cell = oracle.adata.shape[0]
+        k = int(0.025*n_cell)
+        oracle.knn_imputation(n_pca_dims=n_comps, k=k, balanced=True, b_sight=k*8,
+                              b_maxl=k*4, n_jobs=ncores)
+        links = oracle.get_links(cluster_name_for_GRN_unit=group, alpha=10,
+                         verbose_level=10)
+        return links
+
+    def construct_full_grn(self,embedding_name='X_umap'):
+        
+        adata_input = self.adata[:,self.grn_fea]
+        grn = self.run_celloracle(adata_input,self.baseGRN,self.group,embedding_name,self.ncores)
+        full_grn = {}
+        for i in grn.links_dict.keys():
+            raw_grn = grn.links_dict[i]
+            filtered_grn = raw_grn[raw_grn['p']<0.05]
+            full_grn[i] = filtered_grn
+            print('celltype '+str(i) + '. raw pair '+str(raw_grn.shape[0])+' filter pair '+str(filtered_grn.shape[0]))
+        self.full_grn = full_grn
+
+    def construct_metacell_grn(self,embedding_name='X_umap',metacell_num=20,
+                               cell_number=100):
+        
+        adata_input = self.adata[:,self.grn_fea]
+        group1_cell = self.adata.obs_names[self.adata.obs[self.group]=='5']
+        group2_cell = self.adata.obs_names[self.adata.obs[self.group]=='2']
+
+        meta_grn_dict = {}
+        for i in range(metacell_num):
+           print(i)
+           group1_meta = np.random.choice(group1_cell, size=cell_number, 
+                                          replace=False).tolist()
+           group2_meta = np.random.choice(group2_cell, size=cell_number, 
+                                          replace=False).tolist()
+           adata_meta = adata_input[group1_meta+group2_meta]
+           sc.pp.filter_genes(adata_meta,min_cells=3)
+           print(adata_meta)
+           meta_grn = self.run_celloracle(adata_meta,self.baseGRN,self.group,embedding_name,self.ncores)
+           meta_grn_dict[i] = meta_grn.links_dict
+        self.meta_grn = meta_grn_dict
         
         
         

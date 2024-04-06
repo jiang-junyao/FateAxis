@@ -10,6 +10,8 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from torch.optim.lr_scheduler import CosineAnnealingLR
 import torch.optim as optim
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning, module="shap")
 import torch.nn as nn
 import torch.nn.functional as F
 import shap
@@ -113,8 +115,10 @@ class torch_trainer():
             self.model.set_hidden_device(device)
         explainer = shap.DeepExplainer(self.model, data_for_shap)
         shap_values = explainer.shap_values(data_for_shap)
-        score = test_loss*(self.__min_max_scaling(np.abs(shap_values)))
-        
+        np.squeeze(np.abs(shap_values))
+        score = np.abs(shap_values)
+        score = test_loss*(self.__min_max_scaling(np.mean(np.sum(score,axis=0),axis=0)))
+        score =self.__min_max_scaling(score[0])
         return score
 
             
