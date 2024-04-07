@@ -5,3 +5,6 @@
 git clone https://github.com/jiang-junyao/FateAxis.git
 
 pip install .
+
+# Acknowledgement
+### Jack Yu (Ludwig-Maximilians-Universität München)
