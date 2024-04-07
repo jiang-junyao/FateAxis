@@ -8,3 +8,4 @@ pip install .
 
 # Acknowledgement
 ### Jack Yu (Ludwig-Maximilians-Universität München)
+### Chen Li (Peking University)
