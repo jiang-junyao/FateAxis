@@ -1,5 +1,5 @@
 # FateAxis
- Identification of Key Regulatory Relationships Governing Cell State Transitions from scMultiomics Data using AutoML
+ FateAxis is a machine learning framework to identify key transcription factors that regulate cell state transition.
 
 # Install
 git clone https://github.com/jiang-junyao/FateAxis.git
