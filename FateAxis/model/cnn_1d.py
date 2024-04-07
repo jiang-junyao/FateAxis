@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-CNN1D CLF, from JY
+CNN1D CLF
 """
 
 import os

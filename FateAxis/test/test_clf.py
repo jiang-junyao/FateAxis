@@ -9,6 +9,7 @@ warnings.filterwarnings('ignore')
 import FateAxis.model.clf as clf
 import scanpy as sc
 import numpy as np
+import pandas as pd
 import FateAxis.tool.extractor as ext
 
 adata1 = sc.read_h5ad('F:\\public\\LC_procssed.h5ad')
@@ -21,10 +22,12 @@ sc.pp.highly_variable_genes(adata_use,subset=True, n_top_genes=2000)
 ite_num = 1
 steady_state = False
 outline_fea = []
+outline_score = []
+outline_ite = []
 top100 = []
 
 
-while ite_num !=10 or steady_state != True:
+while ite_num <10 or steady_state == True:
     print(adata_use)
     fsn = clf.classification(adata_use.X, adata_use.obs.celltype,dl_epoch=2,
                              feature_name = adata_use.var_names)
@@ -43,6 +46,9 @@ while ite_num !=10 or steady_state != True:
     if outline != 'No_outline':
         for i in outline:
             outline_fea.append(fsn.feature_name[i])
+            outline_score.append(model_ext.z_score[outline])
+            outline_ite.append(ite_num)
+            
     print(outline_fea)
     if outline == 'No_outline' and ite_num>3 and len(top100_intersect)>=95:
         steady_state = True
@@ -51,3 +57,7 @@ while ite_num !=10 or steady_state != True:
     ite_num += 1
     if ite_num!=1:
         adata_use = adata_use[:,~adata_use.var_names.isin(adata_use.var_names[indexes_to_drop])]
+        
+outline_df = pd.DataFrame({'outline_fea':outline_fea,
+                           'outline_score':outline_score,
+                           'outline_ite':outline_ite})

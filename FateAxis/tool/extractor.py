@@ -30,15 +30,15 @@ class extractor:
         self.z_score = pd.Series(z_score, index=np.arange(len(z_score)))
         self.z_score = self.z_score.sort_values(ascending=False)
             
-    def extract_outline_fea(self,z_score_cutoff = 3, outline_foldchange = 3):
-
+    def extract_outline_fea(self,z_score_cutoff = 3, outline_foldchange = 3,
+                            quantile_cutoff = 75):
+        quantile_score = np.percentile(self.z_score, quantile_cutoff)*3
         outline_fea = []
         for i in range(1, len(self.z_score)-1):
             current_value = self.z_score[i]
-            next_value = self.z_score[i+1]
-       
-            if current_value > outline_foldchange * next_value and \
-                current_value > z_score_cutoff:
+            pre_value_cutoff = self.z_score[i-1]/outline_foldchange 
+            cutoff = max(quantile_score,pre_value_cutoff,z_score_cutoff)
+            if current_value > cutoff:
                 outline_fea.append(self.z_score.index[i])
         if outline_fea == []:
             return 'No_outline'
