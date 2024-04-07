@@ -16,6 +16,7 @@ FateAxis/model/cnn_1d.py
 FateAxis/model/cnn_hybrid.py
 FateAxis/model/gru.py
 FateAxis/model/lstm.py
+FateAxis/model/rnn.py
 FateAxis/model/__pycache__/__init__.cpython-310.pyc
 FateAxis/model/__pycache__/classcification.cpython-310.pyc
 FateAxis/test/__init__.py

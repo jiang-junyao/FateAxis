@@ -26,6 +26,7 @@ from FateAxis.model import cnn_1d
 from FateAxis.model import cnn_hybrid
 from FateAxis.model import gru
 from FateAxis.model import lstm
+from FateAxis.model import rnn
 
 class MyDataset(Dataset):
     def __init__(self, data, targets):
@@ -273,7 +274,7 @@ class classification:
 
     def run_lstm(self,explain=True):
         
-        print('---runing gru---')
+        print('---runing lstm---')
 
         for config_use in self.config['LSTM'].keys():
             print(config_use)
@@ -302,7 +303,38 @@ class classification:
                 shap_loader = DataLoader(data, batch_size=1, shuffle=False)
                 shap_score = Trainer.explain(shap_loader,X,device='cpu')
                 self.shap_value[config_use] = shap_score
+                
+    def run_rnn(self,explain=True):
         
+        print('---runing rnn---')
+
+        for config_use in self.config['RNN'].keys():
+            print(config_use)
+            n_fea = self.input_mt.shape[1]
+            model = rnn.RNN(self.device,config_use,n_fea,
+                                **self.config['RNN'][config_use]['config'])
+            model.set_hidden_device('gpu')
+            batch_size = self.config['RNN'][config_use]['batch_size']
+            
+            train_loader = DataLoader(self.train_data, batch_size=batch_size, 
+                                      shuffle=True)
+            test_loader = DataLoader(self.test_data, batch_size=batch_size, 
+                                     shuffle=False)
+
+            Trainer = dl_trainer.torch_trainer(model,device=self.device)
+            Trainer.fit(train_loader,self.dl_epoch,transfer_data=True)
+            loss,acc = Trainer.evaluate(test_loader)
+            self.model_acc[config_use] = acc
+            self.model_loss[config_use] = loss
+            print('acc:'+str(acc))
+            print('loss:'+str(loss))
+            if explain:
+                X = torch.from_numpy(self.input_mt).float()
+                y = torch.from_numpy(self.label).long()
+                data = MyDataset(X, y)
+                shap_loader = DataLoader(data, batch_size=1, shuffle=False)
+                shap_score = Trainer.explain(shap_loader,X,device='cpu')
+                self.shap_value[config_use] = shap_score        
     def __min_max_scaling(self,arr):
 
         min_val = np.min(arr)

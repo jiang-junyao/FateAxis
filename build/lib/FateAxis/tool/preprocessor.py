@@ -154,6 +154,7 @@ class pper:
             for j in grn_meta.keys():
                 grn_use = grn_meta[j]
                 grn_use.index = grn_use['source']+'#'+grn_use['target']
+                grn_use = grn_use[grn_use['p']<0.05]
                 valid_grp = np.intersect1d(list(grn_use.index),self.full_index[j])
                 grn_use = grn_use.loc[valid_grp]
                 filtered_grn[i][j] = grn_use
