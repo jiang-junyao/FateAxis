@@ -45,13 +45,16 @@ class classification:
     def __init__(self,
                  input_mt,
                  label,
+                 config_path=None,
                  split_size = 0.3,
                  dl_epoch = 4,
                  device='gpu',
                  feature_name = [],
+                 acc_cut = 0.9,
                  core_num = 30):
         le = preprocessing.LabelEncoder()
         self.org_label = label
+        self.acc_cut = acc_cut
         self.label = le.fit_transform(label)
         self.input_mt = input_mt
         self.dl_epoch = dl_epoch
@@ -66,8 +69,9 @@ class classification:
         self.model_loss = {}
         self.shap_value = {}
         self.pred = {}
-        config_path = pkg_resources.resource_filename('FateAxis', 
-                                                      'config/config1.js')
+        if config_path==None:
+            config_path = pkg_resources.resource_filename('FateAxis', 
+                                                          'config/config1.js')
         self.config = io_use.read_json(config_path)
         
         # dataset used for torch
@@ -80,7 +84,6 @@ class classification:
     
     ### xgb
     def run_gbm(self, explain = True,para=None):
-        print('---runing xgboost---')
         
         for config_use in self.config['GBM'].keys():
             
@@ -95,22 +98,19 @@ class classification:
                                                        torch.tensor(self.y_test,dtype=torch.long))
                 
                 self.model_loss[config_use] = loss
-                print('acc:'+str(gbm_test_acc))
-                print('loss:'+str(loss))
                 if explain:
                     pred = self.gbm.predict(self.input_mt)
                     idx = pred==self.label
-                    explainer_gbm = shap.TreeExplainer(self.gbm,feature_perturbation = 'interventional',
-                                                       data = self.input_mt[idx])
+                    explainer_gbm = shap.TreeExplainer(self.gbm)
                     shap_vals = explainer_gbm.shap_values(self.input_mt[idx])
-                    self.shap_value[config_use] = loss*(self.__min_max_scaling(np.abs(shap_vals).mean(axis=0)))
+                    self.shap_value[config_use] = (1-loss)*(self.__min_max_scaling(np.abs(shap_vals).mean(axis=0)))
                     
             except Exception:
                 pass
             
     ### linear SVM
     def run_svm(self, explain = True,para=None):
-        print('---runing svm---')
+
         for config_use in self.config['SVM'].keys():
             
             para = self.config['SVM'][config_use]
@@ -123,15 +123,13 @@ class classification:
             loss = torch.nn.CrossEntropyLoss()(torch.tensor(pred),
                                                    torch.tensor(self.y_test,dtype=torch.long))
             self.model_loss[config_use] = loss
-            print('acc:'+str(svm_test_acc))
-            print('loss:'+str(loss))
             if explain:
                 ### evaluate
-                self.shap_value[config_use] = loss*(self.__min_max_scaling(np.abs(self.svm.coef_[0])))
+                self.shap_value[config_use] = (1-loss)*(self.__min_max_scaling(np.abs(self.svm.coef_[0])))
             
     ### Logistic Regression
     def run_lgr(self, explain = True):
-        print('---runing logistic regression---')
+
         for config_use in self.config['logistic regression'].keys():
             
             para = self.config['logistic regression'][config_use]
@@ -143,14 +141,12 @@ class classification:
             loss = torch.nn.CrossEntropyLoss()(torch.tensor(self.lgr.predict_proba(self.x_test)),
                                                    torch.tensor(self.y_test,dtype=torch.long))
             self.model_loss[config_use] = loss
-            print('acc:'+str(test_acc))
-            print('loss:'+str(loss))
             if explain:
-                self.shap_value[config_use] = loss*(self.__min_max_scaling(np.abs(self.lgr.coef_[0])))
+                self.shap_value[config_use] = (1-loss)*(self.__min_max_scaling(np.abs(self.lgr.coef_[0])))
             
     ### Random Forest
     def run_rf(self, explain = True,para=None):
-        print('---runing Random forest---')
+
         for config_use in self.config['RFC'].keys():
             
             para = self.config['RFC'][config_use]
@@ -162,23 +158,23 @@ class classification:
                                                    torch.tensor(self.y_test,dtype=torch.long))
             self.model_acc[config_use] = test_acc
             self.model_loss[config_use] = loss
-            print(test_acc)
-            if explain:
-                pred = self.rf.predict(self.input_mt)
-                idx = pred==self.label
-                explainer_rf = shap.TreeExplainer(self.rf)
-                shap_val = explainer_rf.shap_values(self.input_mt[idx])
-                if len(shap_val)>2:
-                    shap_val = np.array(shap_val).sum(axis=2)
-                self.shap_value[config_use] = loss*(self.__min_max_scaling(np.abs(shap_val).mean(axis=0)))
+            if test_acc >= self.acc_cut:
+                if explain:
+                    pred = self.rf.predict(self.input_mt)
+                    idx = pred==self.label
+                    explainer_rf = shap.TreeExplainer(self.rf)
+                    shap_val = explainer_rf.shap_values(self.input_mt[idx])
+                    if len(shap_val)>2:
+                        shap_val = np.array(shap_val).sum(axis=2)
+                    self.shap_value[config_use] = (1-loss)*(self.__min_max_scaling(np.abs(shap_val).mean(axis=0)))
                 
     ### 1D CNN
     def run_cnn1d(self,explain=True):
         
-        print('---runing CNN1D---')
+
         
         for config_use in self.config['CNN_1D'].keys():
-            print(config_use)
+         
             if self.config['CNN_1D'][config_use]['config']['num_layers'] < 3:
                 model = cnn_1d.Limited(config_use, 
                                 self.config['CNN_1D'][config_use]['config'])
@@ -198,18 +194,20 @@ class classification:
             loss,acc = Trainer.evaluate(test_loader)
             self.model_acc[config_use] = acc
             self.model_loss[config_use] = loss
-            print('acc:'+str(acc))
-            print('loss:'+str(loss))
-            if explain:
-                X = torch.from_numpy(self.input_mt).float()
-                y = torch.from_numpy(self.label).long()
-                data = MyDataset(X, y)
-                shap_loader = DataLoader(data, batch_size=1, shuffle=False)
-                shap_score = Trainer.explain(shap_loader,X)
-                self.shap_value[config_use] = shap_score
+            torch.cuda.empty_cache()
+            if acc >= self.acc_cut:
+                if explain:
+                    X = torch.from_numpy(self.input_mt).float()
+                    y = torch.from_numpy(self.label).long()
+                    data = MyDataset(X, y)
+                    shap_loader = DataLoader(data, batch_size=1, shuffle=False)
+                    shap_score = Trainer.explain(shap_loader,X,
+                                                 acc=acc,acc_thr=self.acc_cut)
+                    self.shap_value[config_use] = shap_score
+                    
     def run_hybrid(self,explain=True):
         
-        print('---runing CNNhybrid---')
+
         
         for config_use in self.config['CNN_Hybrid'].keys():
             print(config_use)
@@ -236,15 +234,13 @@ class classification:
                 y = torch.from_numpy(self.label).long()
                 data = MyDataset(X, y)
                 shap_loader = DataLoader(data, batch_size=1, shuffle=False)
-                shap_score = Trainer.explain(shap_loader,X)
+                shap_score = Trainer.explain(shap_loader,X,acc,self.acc_cut)
                 self.shap_value[config_use] = shap_score
                 
     def run_gru(self,explain=True):
         
-        print('---runing gru---')
 
         for config_use in self.config['GRU'].keys():
-            print(config_use)
             n_fea = self.input_mt.shape[1]
             model = gru.GRU(self.device,config_use, n_fea,
                                 **self.config['GRU'][config_use]['config'])
@@ -262,22 +258,20 @@ class classification:
             loss,acc = Trainer.evaluate(test_loader)
             self.model_acc[config_use] = acc
             self.model_loss[config_use] = loss
-            print('acc:'+str(acc))
-            print('loss:'+str(loss))
-            if explain:
-                X = torch.from_numpy(self.input_mt).float()
-                y = torch.from_numpy(self.label).long()
-                data = MyDataset(X, y)
-                shap_loader = DataLoader(data, batch_size=1, shuffle=False)
-                shap_score = Trainer.explain(shap_loader,X,device='cpu')
-                self.shap_value[config_use] = shap_score
+            if acc >= self.acc_cut:
+                if explain:
+                    X = torch.from_numpy(self.input_mt).float()
+                    y = torch.from_numpy(self.label).long()
+                    data = MyDataset(X, y)
+                    shap_loader = DataLoader(data, batch_size=1, shuffle=False)
+                    shap_score = Trainer.explain(shap_loader,X,device='cpu')
+                    self.shap_value[config_use] = shap_score
 
     def run_lstm(self,explain=True):
-        
-        print('---runing lstm---')
+
 
         for config_use in self.config['LSTM'].keys():
-            print(config_use)
+
             n_fea = self.input_mt.shape[1]
             model = lstm.LSTM(self.device,config_use,n_fea,
                                 **self.config['LSTM'][config_use]['config'])
@@ -294,22 +288,20 @@ class classification:
             loss,acc = Trainer.evaluate(test_loader)
             self.model_acc[config_use] = acc
             self.model_loss[config_use] = loss
-            print('acc:'+str(acc))
-            print('loss:'+str(loss))
-            if explain:
-                X = torch.from_numpy(self.input_mt).float()
-                y = torch.from_numpy(self.label).long()
-                data = MyDataset(X, y)
-                shap_loader = DataLoader(data, batch_size=1, shuffle=False)
-                shap_score = Trainer.explain(shap_loader,X,device='cpu')
-                self.shap_value[config_use] = shap_score
+            if acc >= self.acc_cut:
+                if explain:
+                    X = torch.from_numpy(self.input_mt).float()
+                    y = torch.from_numpy(self.label).long()
+                    data = MyDataset(X, y)
+                    shap_loader = DataLoader(data, batch_size=1, shuffle=False)
+                    shap_score = Trainer.explain(shap_loader,X,device='cpu')
+                    self.shap_value[config_use] = shap_score
                 
     def run_rnn(self,explain=True):
         
-        print('---runing rnn---')
 
         for config_use in self.config['RNN'].keys():
-            print(config_use)
+
             n_fea = self.input_mt.shape[1]
             model = rnn.RNN(self.device,config_use,n_fea,
                                 **self.config['RNN'][config_use]['config'])
@@ -326,15 +318,15 @@ class classification:
             loss,acc = Trainer.evaluate(test_loader)
             self.model_acc[config_use] = acc
             self.model_loss[config_use] = loss
-            print('acc:'+str(acc))
-            print('loss:'+str(loss))
-            if explain:
-                X = torch.from_numpy(self.input_mt).float()
-                y = torch.from_numpy(self.label).long()
-                data = MyDataset(X, y)
-                shap_loader = DataLoader(data, batch_size=1, shuffle=False)
-                shap_score = Trainer.explain(shap_loader,X,device='cpu')
-                self.shap_value[config_use] = shap_score        
+            if acc >= self.acc_cut:
+                if explain:
+                    X = torch.from_numpy(self.input_mt).float()
+                    y = torch.from_numpy(self.label).long()
+                    data = MyDataset(X, y)
+                    shap_loader = DataLoader(data, batch_size=1, shuffle=False)
+                    shap_score = Trainer.explain(shap_loader,X,device='cpu')
+                    self.shap_value[config_use] = shap_score     
+                
     def __min_max_scaling(self,arr):
 
         min_val = np.min(arr)

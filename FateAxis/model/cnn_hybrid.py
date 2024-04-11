@@ -5,6 +5,7 @@ import torch.nn as nn
 from warnings import warn
 import torch.optim as optim
 import torch.nn.functional as F
+import math
 
 class Limited(nn.Module):
     """
@@ -19,7 +20,7 @@ class Limited(nn.Module):
         # Initialization
         self.id = id
         self.model_type = 'CNN_Hybrid_Limited'
-        self.matrixSize = param['matrix_size']
+        self.matrixSize = [5,40]
         self.num_layers = param['num_layers']
         self.loss_func = nn.CrossEntropyLoss()
 
@@ -81,6 +82,7 @@ class Limited(nn.Module):
 
     # Overwrite the forward function in nn.Module
     def forward(self, input):
+        #self.__check_input_matrix_size(input.shape[1]*input.shape[0])
         input = self.reshape(input)
         temp0 = self.poolVer(F.relu(self.convHor(input)))
         temp1 = self.poolHor(F.relu(self.convVer(input)))
@@ -100,8 +102,14 @@ class Limited(nn.Module):
 
     # transform input(1D) into a 2D matrix
     def reshape(self, input):
-        return torch.reshape(input, (input.shape[0], input.shape[1],
-                                    self.matrixSize[0], self.matrixSize[1]))
+        return torch.reshape(input, (input.shape[0], 1,
+                                    13, 154))
+    
+    def __check_input_matrix_size(self, grp_amount):
+        matrix_dim = int(math.sqrt(grp_amount))
+        square_size = [matrix_dim, matrix_dim]
+        self.matrixSize = square_size
+
 
 
 

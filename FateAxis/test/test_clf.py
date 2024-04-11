@@ -20,7 +20,7 @@ adata_use = adata[adata.obs.celltype.isin(['5','2'])]
 sc.pp.highly_variable_genes(adata_use,subset=True, n_top_genes=2000)
 fsn = clf.classification(adata_use.X, adata_use.obs.celltype,dl_epoch=2,
                               feature_name = adata_use.var_names)
-fsn.run_rnn(explain=True)
+fsn.run_hybrid(explain=True)
 
 ite_num = 1
 steady_state = False

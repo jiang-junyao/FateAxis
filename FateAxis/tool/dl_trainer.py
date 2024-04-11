@@ -51,6 +51,7 @@ class torch_trainer():
             for data, target in train_loader:
                 if transfer_data:
                     data = data.unsqueeze(1)
+                data = data.float()
                 data = data.to(self.device)
                 target = target.long()
                 target = target.to(self.device)
@@ -76,6 +77,7 @@ class torch_trainer():
             for data, target in test_loader:
                 if transfer_data:
                     data = data.unsqueeze(1)
+                data = data.float()
                 data = data.to(self.device)
                 target = target.long()
                 target = target.to(self.device)
@@ -87,7 +89,8 @@ class torch_trainer():
                 
         return test_loss / len(test_loader.dataset),correct / len(test_loader.dataset)
     
-    def explain(self,shap_loader,X,transfer_data=True,device=None):
+    def explain(self,shap_loader,X,transfer_data=True,device=None,
+                acc=None,acc_thr=0.9):
         
         self.model.eval()
         correct_pred_index = []
@@ -96,7 +99,7 @@ class torch_trainer():
             for data, target in shap_loader:
                 if transfer_data:
                     data = data.unsqueeze(1)
-                
+                data = data.float()
                 data = data.to(self.device)
                 target = target.long()
                 target = target.to(self.device)
@@ -108,18 +111,20 @@ class torch_trainer():
         correct_pred_index = torch.cat(correct_pred_index).nonzero(as_tuple=True)[0].cpu().numpy()
         data_for_shap = X[correct_pred_index[:10]]
         data_for_shap = data_for_shap.to(torch.device('cpu'))
+        test_loss = test_loss / len(shap_loader.dataset)
         if transfer_data:
             data_for_shap = data_for_shap.unsqueeze(1)
         self.model.to(torch.device('cpu'))
         if device == 'cpu':
             self.model.set_hidden_device(device)
+        torch.cuda.empty_cache()
         explainer = shap.DeepExplainer(self.model, data_for_shap)
-        shap_values = explainer.shap_values(data_for_shap)
+        shap_values = explainer.shap_values(data_for_shap,check_additivity=False)
         np.squeeze(np.abs(shap_values))
         score = np.abs(shap_values)
-        score = test_loss*(self.__min_max_scaling(np.mean(np.sum(score,axis=0),axis=0)))
-        score =self.__min_max_scaling(score[0])
+        score = (1-test_loss)*(self.__min_max_scaling(np.mean(np.mean(score,axis=0),axis=2)[0]))
         return score
+
 
             
     def __min_max_scaling(self,arr):

@@ -3,6 +3,7 @@
 LICENSE
 README.md
 setup.py
+workflow.png
 FateAxis/__init__.py
 FateAxis.egg-info/PKG-INFO
 FateAxis.egg-info/SOURCES.txt
@@ -20,6 +21,7 @@ FateAxis/model/rnn.py
 FateAxis/model/__pycache__/__init__.cpython-310.pyc
 FateAxis/model/__pycache__/classcification.cpython-310.pyc
 FateAxis/test/__init__.py
+FateAxis/test/run_cluster4.py
 FateAxis/test/test_clf.py
 FateAxis/test/test_pp.py
 FateAxis/tfdb/hesc_baseGRN.csv
