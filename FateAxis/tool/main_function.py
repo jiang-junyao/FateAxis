@@ -24,7 +24,8 @@ def calculate_grp_importance(adata,
                             max_loop_number = 10,
                             model_acc_threshold = 0.9,
                             outlier_z_score_threshold = 3,
-                            outlier_quantile = 90):
+                            outlier_quantile = 90,
+                            drop_rate = 0.1):
     ### standlize data
     adata.obs.celltype = label
     adata.obs.feature_num = (adata.X > 0).sum(axis=1)
@@ -65,14 +66,14 @@ def calculate_grp_importance(adata,
                                    fsn.shap_value, model_acc_threshold)
          outline = model_ext.extract_outline_fea(z_score_cutoff=outlier_z_score_threshold,
                                                  quantile_cutoff=outlier_quantile)
-         drop =  model_ext.extract_bottom_fea(0.1)
-         indexes_to_drop = np.concatenate((outline, drop))
+         if drop_rate != 0:
+             drop =  model_ext.extract_bottom_fea(drop_rate)
+             drop_fea = list(fsn.feature_name[drop])
+             print('drop number:'+str(len(drop)))
          z_score = model_ext.z_score
-         z_score = z_score.drop(indexes_to_drop)
          total_score = model_ext.full_score.sum()
-    
-        
-         top500_this_loop = adata.var_names[z_score.iloc[:100].index]
+         print('outlier number:'+str(len(outline)))
+         top500_this_loop = adata_use.var_names[z_score.iloc[:100].index]
          top500_intersect = np.intersect1d(top500_this_loop,top500)
          overlap_num.append(len(top500_intersect))
 
@@ -88,16 +89,15 @@ def calculate_grp_importance(adata,
          outline_score_all = outline_score_all+outline_score
          outline_ite_all = outline_ite_all+outline_ite
          outline_percent_all = outline_percent_all+outline_percent
-         print('overlap num: '+str(len(top500_intersect)))
          if outline == 'No_outline' and ite_num > 3 and len(top500_intersect)>=90:
              steady_state = True
          top500 = top500_this_loop
          ite_num += 1
          if ite_num!=1:
-             adata_use = adata_use[:,~adata_use.var_names.isin(adata_use.var_names[indexes_to_drop])]
-             
-    print(overlap_num)
-
+             adata_use = adata_use[:,~adata_use.var_names.isin(outline_fea)]
+             if drop_rate !=0:
+                 adata_use = adata_use[:,~adata_use.var_names.isin(drop_fea)]
+             print(adata_use)
     outline_df = pd.DataFrame({'outline_fea':outline_fea_all,
                                 'outline_score':outline_score_all,
                                 'outline_ite':outline_ite_all,
@@ -126,6 +126,7 @@ def cal_tf_score(grp_importance):
     sum_scores_df = pd.DataFrame(sum_scores).reset_index()
     sorted_df = sum_scores_df.sort_values('grp_score', ascending=False)
     sorted_df.index = range(sorted_df.shape[0])
+    sorted_df.columns = ['TF','Score']
     return sorted_df
 
 def filter_grp_mt(data,label,
