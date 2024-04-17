@@ -244,7 +244,7 @@ class classification:
             n_fea = self.input_mt.shape[1]
             model = gru.GRU(self.device,config_use, n_fea,
                                 **self.config['GRU'][config_use]['config'])
-            model.set_hidden_device('gpu')
+            model.set_hidden_device(self.device)
             
             batch_size = self.config['GRU'][config_use]['batch_size']
             
@@ -275,7 +275,7 @@ class classification:
             n_fea = self.input_mt.shape[1]
             model = lstm.LSTM(self.device,config_use,n_fea,
                                 **self.config['LSTM'][config_use]['config'])
-            model.set_hidden_device('gpu')
+            model.set_hidden_device(self.device)
             batch_size = self.config['LSTM'][config_use]['batch_size']
             
             train_loader = DataLoader(self.train_data, batch_size=batch_size, 
@@ -305,7 +305,7 @@ class classification:
             n_fea = self.input_mt.shape[1]
             model = rnn.RNN(self.device,config_use,n_fea,
                                 **self.config['RNN'][config_use]['config'])
-            model.set_hidden_device('gpu')
+            model.set_hidden_device(self.device)
             batch_size = self.config['RNN'][config_use]['batch_size']
             
             train_loader = DataLoader(self.train_data, batch_size=batch_size, 

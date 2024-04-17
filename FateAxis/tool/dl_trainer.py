@@ -28,8 +28,8 @@ class torch_trainer():
                  device = 'gpu'):
         
         self.model = model
-        if device=='gpu' and torch.cuda.is_available():
-            self.device = torch.device('cuda')
+        if 'cuda' in device and torch.cuda.is_available():
+            self.device = torch.device(device)
             #torch.set_default_tensor_type(torch.cuda.FloatTensor)
             #print('GPU lanuch!')
         else:

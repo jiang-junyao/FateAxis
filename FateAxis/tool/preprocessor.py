@@ -41,24 +41,28 @@ class pper:
         else:
             self.baseGRN = baseGRN
             
-    def extract_fea(self,pval_thr=0.05,tf_exp_thr=0.05):
+    def extract_fea(self,type='deg',hgv_num=2000,
+                    pval_thr=0.05,tf_exp_thr=0.05):
         
-        ### extract deg
-        sc.pp.log1p(self.adata)
-        sc.tl.rank_genes_groups(self.adata,self.group, method='wilcoxon')
-        result = self.adata.uns['rank_genes_groups']
-
-        groups = result['names'].dtype.names
-        differential_genes = []
-        for group in groups:
-            genes = result['names'][group]
-            pvals_adj = result['pvals_adj'][group]
-            
-            for gene, pval_adj in zip(genes, pvals_adj):
-                if pval_adj < pval_thr:
-                    differential_genes.append(gene)
-        differential_genes = list(set(differential_genes))
-        
+        if type=='deg':
+            ### extract deg
+            sc.pp.log1p(self.adata)
+            sc.tl.rank_genes_groups(self.adata,self.group, method='wilcoxon')
+            result = self.adata.uns['rank_genes_groups']
+            groups = result['names'].dtype.names
+            differential_genes = []
+            for group in groups:
+                genes = result['names'][group]
+                pvals_adj = result['pvals_adj'][group]
+                
+                for gene, pval_adj in zip(genes, pvals_adj):
+                    if pval_adj < pval_thr:
+                        differential_genes.append(gene)
+            differential_genes = list(set(differential_genes))
+        elif type=='hvg':
+            sc.pp.highly_variable_genes(self.adata,n_top_genes=2000,
+                                        subset=False,flavor="seurat_v3")
+            differential_genes = list(self.adata.var_names[self.adata.var['highly_variable']])
         ### extract expressed tf
         tf_name = pd.read_table(self.tf_path,header=None)[0].tolist()
         tf_name = np.intersect1d(tf_name, self.adata.var_names)
@@ -84,7 +88,7 @@ class pper:
         print('expressed tf num:'+str(len(selected_tf)))
         print('total feature num:'+str(len(self.grn_fea)))
         
-    def construct_full_grn(self,embedding_name='X_umap'):
+    def construct_full_grn(self,embedding_name='X_umap',top_grp_percent=0.5):
         
         adata_input = self.adata[:,self.grn_fea]
         grn = self.run_celloracle(adata_input,self.baseGRN,
@@ -94,7 +98,10 @@ class pper:
         for i in grn.links_dict.keys():
             raw_grn = grn.links_dict[i]
             filtered_grn = raw_grn[raw_grn['p']<0.05]
-            filtered_grn = filtered_grn[filtered_grn['coef_abs']>0]
+            filtered_grn = filtered_grn.sort_values('coef_abs',
+                                                    ascending=False)
+            filtered_grn = filtered_grn.head(int(top_grp_percent*len(filtered_grn)))
+
             full_grn[i] = filtered_grn
             full_index[i] = filtered_grn['source']+'#'+filtered_grn['target']
             print('celltype '+str(i) + '. raw pair '+str(raw_grn.shape[0])+\

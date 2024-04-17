@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+
 """
 This file contains classes to build GRU based classifiers
 
@@ -60,9 +60,7 @@ class GRU(nn.Module):
         return out
 
     def set_hidden_device(self,device='gpu'):
-        if device=='gpu' and torch.cuda.is_available():
-            self.device = torch.device('cuda')
-            #torch.set_default_tensor_type(torch.cuda.FloatTensor)
-            #print('GPU lanuch!')
-        else:
+        if device =='cpu':
             self.device = torch.device('cpu')
+        else:
+            self.device = torch.device(device)

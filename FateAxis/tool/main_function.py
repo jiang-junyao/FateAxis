@@ -25,7 +25,8 @@ def calculate_grp_importance(adata,
                             model_acc_threshold = 0.9,
                             outlier_z_score_threshold = 3,
                             outlier_quantile = 90,
-                            drop_rate = 0.1):
+                            drop_rate = 0.1,
+                            device='cuda:0'):
     ### standlize data
     adata.obs.celltype = label
     adata.obs.feature_num = (adata.X > 0).sum(axis=1)
@@ -43,7 +44,8 @@ def calculate_grp_importance(adata,
          print('Classify grp at iteration: '+str(ite_num))
          fsn = clf.classification(adata_use.X, label,config_path,dl_epoch=5,
                                   feature_name = adata_use.var_names,
-                                  core_num=core_use,acc_cut=model_acc_threshold)
+                                  core_num=core_use,acc_cut=model_acc_threshold,
+                                  device = device)
          ### lanuch model
          if 'cnn' in model_use:
              fsn.run_cnn1d(explain=True)
