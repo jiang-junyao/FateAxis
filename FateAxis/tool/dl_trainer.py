@@ -34,7 +34,7 @@ class torch_trainer():
             #print('GPU lanuch!')
         else:
             self.device = torch.device('cpu')
-            #print('only using CPU to train DL model~~~')
+            print('only using CPU to train DL model~~~')
         self.model = self.model.to(self.device)
         
     def fit(self,train_loader, total_epoch=4,transfer_data=True):
