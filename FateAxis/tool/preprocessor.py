@@ -8,6 +8,8 @@ import scanpy as sc
 import pandas as pd
 import pkg_resources
 import numpy as np
+from sklearn.neighbors import kneighbors_graph
+from sklearn.cluster import AgglomerativeClustering
 import celloracle as co
 class pper:
     def __init__(self,
@@ -108,34 +110,71 @@ class pper:
                   ' filter pair '+str(filtered_grn.shape[0]))
         self.full_grn = full_grn
         self.full_index = full_index
+    
 
-    def construct_metacell_grn(self,embedding_name='X_umap',metacell_num=20,
-                               cell_number=100):
+
+    def construct_metacell_grn(self,use_rep='X_pca',embedding_name='X_umap',
+                               metacell_method='knn',knn_dis_thr=10,
+                               knn_neigb=20,
+                       random_metacell_num=50,random_cell_number=100):
         
         adata_input = self.adata[:,self.grn_fea]
         group1 = list(set(adata_input.obs[self.group]))[0]
         group2 = list(set(adata_input.obs[self.group]))[1]
         group1_cell = adata_input.obs_names[adata_input.obs[self.group]==group1]
         group2_cell = adata_input.obs_names[adata_input.obs[self.group]==group2]
-
-        meta_grn_dict = {}
-        for i in range(metacell_num):
-           print(i)
-           group1_meta = np.random.choice(group1_cell, size=cell_number, 
-                                          replace=False).tolist()
-           group2_meta = np.random.choice(group2_cell, size=cell_number, 
-                                          replace=False).tolist()
-           adata_meta = adata_input[group1_meta+group2_meta]
-           sc.pp.filter_genes(adata_meta,min_cells=3)
-           print(adata_meta)
-           meta_grn = self.run_celloracle(adata_meta,self.baseGRN,
-                                          self.group,embedding_name,
-                                          self.ncores)
-           #meta_grn_dict[i] = self.__filter_grp(meta_grn.links_dict)
-           meta_grn_dict[i] = meta_grn.links_dict
+      
+        if metacell_method=='knn':
+            metacells = []
+            metacell_celltypes = []
+            metacell_to_cells = {}
+            
+            for celltype in adata_input.obs['celltype'].unique():
+                adata_subset = adata_input[adata_input.obs['celltype'] == celltype]
+            
+            
+                knn_graph = kneighbors_graph(adata_subset.obsm[use_rep], 
+                                             n_neighbors=knn_neigb, 
+                                             mode='connectivity')
+            
+                clustering = AgglomerativeClustering(n_clusters=None, 
+                                                     distance_threshold=knn_dis_thr, 
+                                                     connectivity=knn_graph)
+                adata_subset.obs['clusters'] = clustering.fit_predict(adata_subset.obsm[use_rep])
+            
+                for cluster_id in np.unique(adata_subset.obs['clusters']):
+                    cluster_cells = adata_subset[adata_subset.obs['clusters'] == cluster_id]
+                    meta_grn = self.run_celloracle(adata_subset[cluster_cells],self.baseGRN,
+                                                   self.group,embedding_name,
+                                                   self.ncores,
+                                                   use_rep=use_rep)
+                    metacell = cluster_cells.X.mean(axis=0)
+                    metacells.append(metacell)
+                    metacell_celltypes.append(celltype)
+                    metacell_to_cells[len(metacells) - 1] = cluster_cells.obs_names.tolist()
+            
+            metacells = np.array(metacells)
+            
+        elif metacell_method=='random':
+            meta_grn_dict = {}
+            for i in range(random_metacell_num):
+               print(i)
+               group1_meta = np.random.choice(group1_cell, size=random_cell_number, 
+                                              replace=False).tolist()
+               group2_meta = np.random.choice(group2_cell, size=random_cell_number, 
+                                              replace=False).tolist()
+               adata_meta = adata_input[group1_meta+group2_meta]
+               sc.pp.filter_genes(adata_meta,min_cells=3)
+               print(adata_meta)
+               meta_grn = self.run_celloracle(adata_meta,self.baseGRN,
+                                              self.group,embedding_name,
+                                              self.ncores)
+               #meta_grn_dict[i] = self.__filter_grp(meta_grn.links_dict)
+               meta_grn_dict[i] = meta_grn.links_dict
+               
         self.meta_grn = meta_grn_dict
     
-    def run_celloracle(self,adata,baseGRN=None,group='celltype',
+    def run_celloracle(self,adata,baseGRN=None,group='celltype',use_rep='X_pca',
                        embedding_name='X_umap',ncores=10,filter=None):
         
         print('build grn based on celloracle')
@@ -143,12 +182,15 @@ class pper:
         oracle.import_anndata_as_raw_count(adata=adata,
                                    cluster_column_name=group,
                                    embedding_name=embedding_name)
+        oracle.import_anndata_as_raw_count(adata=adata,
+                                   cluster_column_name=group,
+                                   embedding_name=embedding_name)
         oracle.import_TF_data(TF_info_matrix=baseGRN)
-        oracle.perform_PCA()
-        n_comps = np.where(np.diff(np.diff(np.cumsum(oracle.pca.explained_variance_ratio_))>0.002))[0][0]
+        oracle.pcs=adata.obsm[use_rep]
         n_cell = oracle.adata.shape[0]
         k = int(0.025*n_cell)
-        oracle.knn_imputation(n_pca_dims=n_comps, k=k, balanced=True, b_sight=k*8,
+        oracle.knn_imputation(n_pca_dims=adata.obsm[use_rep].shape[1], 
+                              k=k, balanced=True, b_sight=k*8,
                               b_maxl=k*4, n_jobs=ncores)
         links = oracle.get_links(cluster_name_for_GRN_unit=group, alpha=10,
                          verbose_level=10)
