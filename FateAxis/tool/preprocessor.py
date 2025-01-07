@@ -23,7 +23,7 @@ class pper:
         self.group = group
         self.species = species
         self.ncores = ncores
-
+        self.baseGRN = baseGRN
         
         ### set tf db
         if species == 'hs':
@@ -40,10 +40,9 @@ class pper:
             self.baseGRN = co.data.load_human_promoter_base_GRN()
         elif (baseGRN is None) & (self.species=='mm'):
             baseGRN = co.data.load_mouse_scATAC_atlas_base_GRN()
-        else:
-            self.baseGRN = baseGRN
+
             
-    def extract_fea(self,type='deg',hgv_num=2000,
+    def extract_fea(self,type='deg',hvg_num=2000,
                     pval_thr=0.05,tf_exp_thr=0.05):
         
         if type=='deg':
@@ -62,7 +61,7 @@ class pper:
                         differential_genes.append(gene)
             differential_genes = list(set(differential_genes))
         elif type=='hvg':
-            sc.pp.highly_variable_genes(self.adata,n_top_genes=2000,
+            sc.pp.highly_variable_genes(self.adata,n_top_genes=hvg_num,
                                         subset=False,flavor="seurat_v3")
             differential_genes = list(self.adata.var_names[self.adata.var['highly_variable']])
         ### extract expressed tf
@@ -118,16 +117,16 @@ class pper:
 
 
     def construct_metacell_grn(self,use_rep='X_pca',embedding_name='X_umap',
-                               metacell_method='knn',knn_dis_thr=10,
+                               metacell_method='knn',
                                knn_neigb=20,
-                       random_metacell_num=50,random_cell_number=100):
+                       metacell_num=50,random_cell_number=100):
         
         adata_input = self.adata[:,self.grn_fea]
         group1 = list(set(adata_input.obs[self.group]))[0]
         group2 = list(set(adata_input.obs[self.group]))[1]
         group1_cell = adata_input.obs_names[adata_input.obs[self.group]==group1]
         group2_cell = adata_input.obs_names[adata_input.obs[self.group]==group2]
-        
+
         meta_grn_dict = {}
         if metacell_method=='knn':
             
@@ -139,30 +138,30 @@ class pper:
                                              n_neighbors=knn_neigb, 
                                              mode='connectivity')
             
-                clustering = AgglomerativeClustering(n_clusters=None, 
-                                                     distance_threshold=knn_dis_thr, 
+                clustering = AgglomerativeClustering(n_clusters=metacell_num,
                                                      connectivity=knn_graph)
                 adata_subset.obs['clusters'] = clustering.fit_predict(adata_subset.obsm[use_rep])
-            
-                for cluster_id in np.unique(adata_subset.obs['clusters']):
-                    cluster_cells = adata_subset[adata_subset.obs['clusters'] == cluster_id]
-                    meta_grn = self.run_celloracle(adata_subset[cluster_cells],
-                                                   baseGRN=self.baseGRN,
-                                              group=self.group,
-                                              embedding_name=embedding_name,
-                                              ncores=self.ncores,
-                                              use_rep=use_rep)
-                    meta_grn_dict[str(cluster_id)+'#'+celltype] = \
-                        meta_grn.links_dict
+                adata_subset.obs['clusters'] = adata_subset.obs['clusters'].astype(str)
+                meta_grn = self.run_celloracle(adata_subset,
+                                               baseGRN=self.baseGRN,
+                                          group='clusters',
+                                          embedding_name=embedding_name,
+                                          ncores=self.ncores,
+                                          use_rep=use_rep)
+                for i in list(meta_grn.links_dict.keys()):
+                    
+                    meta_grn_dict[str(i)+'#'+celltype] = \
+                        meta_grn.links_dict[i]
             
         elif metacell_method=='random':
-            for i in range(random_metacell_num):
+            for i in range(metacell_num):
                print(i)
                group1_meta = np.random.choice(group1_cell, size=random_cell_number, 
                                               replace=False).tolist()
                group2_meta = np.random.choice(group2_cell, size=random_cell_number, 
                                               replace=False).tolist()
                adata_meta = adata_input[group1_meta+group2_meta]
+               sc.pp.filter_cells(adata_meta, min_genes=random_cell_number/10)
                sc.pp.filter_genes(adata_meta,min_cells=3)
                print(adata_meta)
                meta_grn = self.run_celloracle(adata=adata_meta,
@@ -172,18 +171,16 @@ class pper:
                                          ncores=self.ncores,
                                          use_rep=use_rep)
                #meta_grn_dict[i] = self.__filter_grp(meta_grn.links_dict)
-               meta_grn_dict[i] = meta_grn.links_dict
+               for j in list(meta_grn.links_dict.keys()):
+                   
+                   meta_grn_dict[str(i)+'#'+str(j)] = \
+                       meta_grn.links_dict[j]
                
         self.meta_grn = meta_grn_dict
     
     def run_celloracle(self,adata,baseGRN=None,group='celltype',use_rep='X_pca',
                        embedding_name='X_umap',ncores=10,filter=None):
-        
-        print('build grn based on celloracle')
         oracle = co.Oracle()
-        oracle.import_anndata_as_raw_count(adata=adata,
-                                   cluster_column_name=group,
-                                   embedding_name=embedding_name)
         oracle.import_anndata_as_raw_count(adata=adata,
                                    cluster_column_name=group,
                                    embedding_name=embedding_name)
@@ -198,23 +195,21 @@ class pper:
                          verbose_level=10)
         return links
 
-    def filter_grp(self,grn):
+    def filter_grp(self,meta_grn,pval_cutoff=0.05):
         filtered_grn = self.meta_grn
         for i in self.meta_grn.keys():
-            grn_meta = self.meta_grn[i]
-            for j in grn_meta.keys():
-                grn_use = grn_meta[j]
-                grn_use.index = grn_use['source']+'#'+grn_use['target']
-                grn_use = grn_use[grn_use['p']<0.05]
-                valid_grp = np.intersect1d(list(grn_use.index),self.full_index[j])
-                grn_use = grn_use.loc[valid_grp]
-                filtered_grn[i][j] = grn_use
-        all_indexes = set(index for d in filtered_grn.values() for sd in d.values() for index in sd.index)
+            grn_use = self.meta_grn[i]
+            grn_use.index = grn_use['source']+'#'+grn_use['target']
+            grn_use = grn_use[grn_use['p']<pval_cutoff]
+            celltype_use = i.split('#')[1]
+            valid_grp = np.intersect1d(list(grn_use.index),self.full_index[celltype_use])
+            grn_use = grn_use.loc[valid_grp]
+            filtered_grn[i] = grn_use
+        all_indexes = set(index for sd in filtered_grn.values() for index in sd.index)
         
-        result = pd.concat({(str(i)+'#'+str(j)): \
-                            filtered_grn[i][j]['coef_mean'].reindex(all_indexes, 
+        result = pd.concat({(str(i)): \
+                            filtered_grn[i]['coef_mean'].reindex(all_indexes, 
                                                                     fill_value=0)
-                            for i in filtered_grn.keys() 
-                            for j in filtered_grn[i].keys()}, 
+                            for i in filtered_grn.keys()}, 
                            axis=1)
         return result
