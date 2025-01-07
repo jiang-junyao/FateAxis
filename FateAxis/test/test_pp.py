@@ -12,6 +12,9 @@ adata=sc.AnnData(adata1.X)
 adata.obs = adata1.obs
 adata.var = adata1.var
 adata_use = adata[adata.obs.celltype.isin(['5','2'])]
+sc.pp.normalize_total(adata_use)
+sc.pp.highly_variable_genes(adata_use)
+sc.pp.pca(adata_use)
 processor=pp.pper(adata_use, 'celltype','hs')
 processor.extract_fea()
 print(adata_use)

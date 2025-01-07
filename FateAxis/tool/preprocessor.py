@@ -90,11 +90,15 @@ class pper:
         print('expressed tf num:'+str(len(selected_tf)))
         print('total feature num:'+str(len(self.grn_fea)))
         
-    def construct_full_grn(self,embedding_name='X_umap',top_grp_percent=0.5):
+    def construct_full_grn(self,use_rep='X_pca',
+                           embedding_name='X_umap',top_grp_percent=0.5):
         
         adata_input = self.adata[:,self.grn_fea]
-        grn = self.run_celloracle(adata_input,self.baseGRN,
-                                  self.group,embedding_name,self.ncores)
+        grn = self.run_celloracle(adata=adata_input,baseGRN=self.baseGRN,
+                                  group=self.group,
+                                  embedding_name=embedding_name,
+                                  ncores=self.ncores,
+                                  use_rep=use_rep)
         full_grn = {}
         full_index = {}
         for i in grn.links_dict.keys():
@@ -123,11 +127,9 @@ class pper:
         group2 = list(set(adata_input.obs[self.group]))[1]
         group1_cell = adata_input.obs_names[adata_input.obs[self.group]==group1]
         group2_cell = adata_input.obs_names[adata_input.obs[self.group]==group2]
-      
+        
+        meta_grn_dict = {}
         if metacell_method=='knn':
-            metacells = []
-            metacell_celltypes = []
-            metacell_to_cells = {}
             
             for celltype in adata_input.obs['celltype'].unique():
                 adata_subset = adata_input[adata_input.obs['celltype'] == celltype]
@@ -144,19 +146,16 @@ class pper:
             
                 for cluster_id in np.unique(adata_subset.obs['clusters']):
                     cluster_cells = adata_subset[adata_subset.obs['clusters'] == cluster_id]
-                    meta_grn = self.run_celloracle(adata_subset[cluster_cells],self.baseGRN,
-                                                   self.group,embedding_name,
-                                                   self.ncores,
-                                                   use_rep=use_rep)
-                    metacell = cluster_cells.X.mean(axis=0)
-                    metacells.append(metacell)
-                    metacell_celltypes.append(celltype)
-                    metacell_to_cells[len(metacells) - 1] = cluster_cells.obs_names.tolist()
-            
-            metacells = np.array(metacells)
+                    meta_grn = self.run_celloracle(adata_subset[cluster_cells],
+                                                   baseGRN=self.baseGRN,
+                                              group=self.group,
+                                              embedding_name=embedding_name,
+                                              ncores=self.ncores,
+                                              use_rep=use_rep)
+                    meta_grn_dict[str(cluster_id)+'#'+celltype] = \
+                        meta_grn.links_dict
             
         elif metacell_method=='random':
-            meta_grn_dict = {}
             for i in range(random_metacell_num):
                print(i)
                group1_meta = np.random.choice(group1_cell, size=random_cell_number, 
@@ -166,9 +165,12 @@ class pper:
                adata_meta = adata_input[group1_meta+group2_meta]
                sc.pp.filter_genes(adata_meta,min_cells=3)
                print(adata_meta)
-               meta_grn = self.run_celloracle(adata_meta,self.baseGRN,
-                                              self.group,embedding_name,
-                                              self.ncores)
+               meta_grn = self.run_celloracle(adata=adata_meta,
+                                              baseGRN=self.baseGRN,
+                                         group=self.group,
+                                         embedding_name=embedding_name,
+                                         ncores=self.ncores,
+                                         use_rep=use_rep)
                #meta_grn_dict[i] = self.__filter_grp(meta_grn.links_dict)
                meta_grn_dict[i] = meta_grn.links_dict
                
