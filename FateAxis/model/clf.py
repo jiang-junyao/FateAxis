@@ -17,7 +17,6 @@ import torch
 from scipy.special import softmax
 import pandas as pd
 import numpy as np
-from sklearn.metrics import roc_auc_score
 from torch.utils.data import Dataset, DataLoader
 
 ### DL module
@@ -51,8 +50,10 @@ class classification:
                  device='gpu',
                  feature_name = [],
                  acc_cut = 0.9,
-                 core_num = 30):
+                 core_num = 30,
+                 model_outdir=None):
         le = preprocessing.LabelEncoder()
+        self.model_outdir = model_outdir
         self.org_label = label
         self.acc_cut = acc_cut
         self.label = le.fit_transform(label)
@@ -67,6 +68,7 @@ class classification:
                                                                                 random_state=114514)
         self.model_acc = {}
         self.model_loss = {}
+        self.saved_models = {}
         self.shap_value = {}
         self.pred = {}
         if config_path==None:
@@ -83,7 +85,7 @@ class classification:
 
     
     ### xgb
-    def run_gbm(self, explain = True,para=None):
+    def run_gbm(self, explain = True,para=None,save_model=True):
         
         for config_use in self.config['GBM'].keys():
             
@@ -105,11 +107,13 @@ class classification:
                     shap_vals = explainer_gbm.shap_values(self.input_mt[idx])
                     self.shap_value[config_use] = (1-loss)*(self.__min_max_scaling(np.abs(shap_vals).mean(axis=0)))
                     
+                if save_model:
+                    self.saved_models[config_use] = self.gbm
             except Exception:
                 pass
             
     ### linear SVM
-    def run_svm(self, explain = True,para=None):
+    def run_svm(self, explain = True,para=None,save_model=True):
 
         for config_use in self.config['SVM'].keys():
             
@@ -123,12 +127,14 @@ class classification:
             loss = torch.nn.CrossEntropyLoss()(torch.tensor(pred),
                                                    torch.tensor(self.y_test,dtype=torch.long))
             self.model_loss[config_use] = loss
+            if save_model:
+                self.saved_models[config_use] = self.svm
             if explain:
                 ### evaluate
                 self.shap_value[config_use] = (1-loss)*(self.__min_max_scaling(np.abs(self.svm.coef_[0])))
             
     ### Logistic Regression
-    def run_lgr(self, explain = True):
+    def run_lgr(self, explain = True,save_model=True):
 
         for config_use in self.config['logistic regression'].keys():
             
@@ -143,9 +149,10 @@ class classification:
             self.model_loss[config_use] = loss
             if explain:
                 self.shap_value[config_use] = (1-loss)*(self.__min_max_scaling(np.abs(self.lgr.coef_[0])))
-            
+            if save_model:
+                self.saved_models[config_use] = self.lgr
     ### Random Forest
-    def run_rf(self, explain = True,para=None):
+    def run_rf(self, explain = True,para=None,save_model=True):
 
         for config_use in self.config['RFC'].keys():
             
@@ -167,11 +174,15 @@ class classification:
                     if len(shap_val)>2:
                         shap_val = np.array(shap_val).sum(axis=2)
                     self.shap_value[config_use] = (1-loss)*(self.__min_max_scaling(np.abs(shap_val).mean(axis=0)))
+            if save_model:
+                self.saved_models[config_use] = self.rf
                 
     ### 1D CNN
-    def run_cnn1d(self,explain=True):
+    def run_cnn1d(self,explain=True,save_model=True,
+                  load_model=False,
+                  do_predict=False,
+                  model_dir=None):
         
-
         
         for config_use in self.config['CNN_1D'].keys():
          
@@ -204,8 +215,12 @@ class classification:
                     shap_score = Trainer.explain(shap_loader,X,
                                                  acc=acc,acc_thr=self.acc_cut)
                     self.shap_value[config_use] = shap_score
+            if save_model:
+                outpath = self.model_outdir+config_use
+                Trainer.save_model(outpath)
+                self.saved_models[config_use] = outpath
                     
-    def run_hybrid(self,explain=True):
+    def run_hybrid(self,explain=True,save_model=True):
         
 
         
@@ -236,8 +251,12 @@ class classification:
                 shap_loader = DataLoader(data, batch_size=1, shuffle=False)
                 shap_score = Trainer.explain(shap_loader,X,acc,self.acc_cut)
                 self.shap_value[config_use] = shap_score
+            if save_model:
+                outpath = self.model_outdir+config_use
+                Trainer.save_model(outpath)
+                self.saved_models[config_use] = outpath
                 
-    def run_gru(self,explain=True):
+    def run_gru(self,explain=True,save_model=True):
         
 
         for config_use in self.config['GRU'].keys():
@@ -266,8 +285,12 @@ class classification:
                     shap_loader = DataLoader(data, batch_size=1, shuffle=False)
                     shap_score = Trainer.explain(shap_loader,X,device='cpu')
                     self.shap_value[config_use] = shap_score
+            if save_model:
+                outpath = self.model_outdir+config_use
+                Trainer.save_model(outpath)
+                self.saved_models[config_use] = outpath
 
-    def run_lstm(self,explain=True):
+    def run_lstm(self,explain=True,save_model=True):
 
 
         for config_use in self.config['LSTM'].keys():
@@ -296,8 +319,13 @@ class classification:
                     shap_loader = DataLoader(data, batch_size=1, shuffle=False)
                     shap_score = Trainer.explain(shap_loader,X,device='cpu')
                     self.shap_value[config_use] = shap_score
+                    
+            if save_model:
+                outpath = self.model_outdir+config_use
+                Trainer.save_model(outpath)
+                self.saved_models[config_use] = outpath
                 
-    def run_rnn(self,explain=True):
+    def run_rnn(self,explain=True,save_model=True):
         
 
         for config_use in self.config['RNN'].keys():
@@ -326,6 +354,11 @@ class classification:
                     shap_loader = DataLoader(data, batch_size=1, shuffle=False)
                     shap_score = Trainer.explain(shap_loader,X,device='cpu')
                     self.shap_value[config_use] = shap_score     
+                    
+            if save_model:
+                outpath = self.model_outdir+config_use
+                Trainer.save_model(outpath)
+                self.saved_models[config_use] = outpath
                 
     def __min_max_scaling(self,arr):
 

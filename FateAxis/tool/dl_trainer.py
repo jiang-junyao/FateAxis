@@ -15,6 +15,7 @@ warnings.filterwarnings("ignore", category=UserWarning, module="shap")
 import torch.nn as nn
 import torch.nn.functional as F
 import shap
+import os
 import numpy as np
 
 class Error(Exception):
@@ -25,7 +26,8 @@ class Error(Exception):
 class torch_trainer():
     def __init__(self,
                  model,
-                 device = 'gpu'):
+                 device = 'gpu',
+                 just_train = True):
         
         self.model = model
         if 'cuda' in device and torch.cuda.is_available():
@@ -35,7 +37,22 @@ class torch_trainer():
         else:
             self.device = torch.device('cpu')
             print('only using CPU to train DL model~~~')
-        self.model = self.model.to(self.device)
+        if just_train:
+            self.model = self.model.to(self.device)
+    
+    def save_model(self, file_path):
+
+
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        torch.save(self.model, file_path)
+
+    def load_model(self, file_path, map_location=None):
+
+        if map_location is None:
+            map_location = self.device
+
+        loaded_model = torch.load(file_path, map_location=map_location)
+        self.model = loaded_model.to(self.device)
         
     def fit(self,train_loader, total_epoch=4,transfer_data=True):
 
@@ -88,6 +105,50 @@ class torch_trainer():
                 correct += pred.eq(target.view_as(pred)).sum().item()
                 
         return test_loss / len(test_loader.dataset),correct / len(test_loader.dataset)
+    
+    def predict(self, test_loader, transfer_data=True):
+        """
+        Predict and return two arrays: predicted labels and probabilities.
+    
+        Args:
+            test_loader (DataLoader): DataLoader for the data to predict.
+            transfer_data (bool): Whether to unsqueeze data for channel dimension.
+    
+        Returns:
+            Tuple[np.ndarray, np.ndarray]: 
+                - pred_labels: Array of predicted labels for each sample.
+                - pred_probs: Array of predicted probabilities for each sample.
+        """
+        self.model.eval()
+        pred_labels = []
+        pred_probs = []
+    
+        with torch.no_grad():
+            for data in test_loader:
+                # If DataLoader provides (data, _) but we don't need labels, use only `data`.
+                if isinstance(data, (list, tuple)):
+                    data = data[0]
+    
+                # Adjust data format if needed (e.g., add channel dimension).
+                if transfer_data:
+                    data = data.unsqueeze(1)
+                data = data.float()
+                data = data.to(self.device)
+    
+                # Forward pass.
+                output = self.model(data)
+    
+                # Compute probabilities.
+                probabilities = F.softmax(output, dim=1)
+    
+                # Get predicted labels.
+                predicted_labels = output.argmax(dim=1)
+    
+                # Append batch results to the arrays.
+                pred_labels.extend(predicted_labels.cpu().numpy())  # Convert to numpy array.
+                pred_probs.extend(probabilities.cpu().numpy())      # Convert to numpy array.
+    
+        return np.array(pred_labels), np.array(pred_probs)
     
     def explain(self,shap_loader,X,transfer_data=True,device=None,
                 acc=None,acc_thr=0.9):
