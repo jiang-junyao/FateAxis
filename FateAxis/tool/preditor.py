@@ -34,6 +34,7 @@ def get_model_predictions(fsn,pred_data,batch_size=10,model_acc_cutoff=0.95):
     test_loader = DataLoader(pred_data, batch_size=batch_size, 
                                      shuffle=False)
     model_probabilities = []
+    model_use = []
     model_labels = []
 
     for model_name in fsn.saved_models.keys():
@@ -46,19 +47,22 @@ def get_model_predictions(fsn,pred_data,batch_size=10,model_acc_cutoff=0.95):
                                                    just_train=False)
                 Trainer.load_model(model)
                 labels, probabilities = Trainer.predict(test_loader)
-                model_labels.append(labels)
+                converted_labels = [fsn.label_map[l] for l in labels]
+                model_labels.append(converted_labels)
                 model_probabilities.append(probabilities)
-                
+                model_use.append(model_name)
             ## for sklearn model
             else:  
     
                 probabilities = model.predict_proba(pred_data)
                 labels = np.argmax(probabilities, axis=1)
-                model_labels.append(labels)
+                converted_labels = [fsn.label_map[l] for l in labels]
+                model_labels.append(converted_labels)
                 model_probabilities.append(probabilities)
+                model_use.append(model_name)
     
     if len(model_labels)>0:
-        return model_labels, model_probabilities
+        return model_use, model_probabilities,model_labels
     
     else:
         raise ValueError("no model pass the cutoff, please re-start the acc_cut")

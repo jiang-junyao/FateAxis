@@ -55,8 +55,10 @@ class classification:
         le = preprocessing.LabelEncoder()
         self.model_outdir = model_outdir
         self.org_label = label
+        self.num_class = len(set(label))
         self.acc_cut = acc_cut
         self.label = le.fit_transform(label)
+        self.label_map = dict(zip( le.transform(le.classes_),le.classes_))
         self.input_mt = input_mt
         self.dl_epoch = dl_epoch
         self.device = device
@@ -91,6 +93,7 @@ class classification:
             
             try:
                 para = self.config['GBM'][config_use]
+                para['config']["num_class"] = self.num_class
                 self.gbm = XGBClassifier(**para['config'])
                 self.gbm.fit(self.x_train, self.y_train)
         
@@ -188,7 +191,8 @@ class classification:
          
             if self.config['CNN_1D'][config_use]['config']['num_layers'] < 3:
                 model = cnn_1d.Limited(config_use, 
-                                self.config['CNN_1D'][config_use]['config'])
+                                self.config['CNN_1D'][config_use]['config'],
+                                n_class=self.num_class)
             else:
                 model = cnn_1d.Unlimited(config_use, 
                                 self.config['CNN_1D'][config_use]['config'])
@@ -262,7 +266,8 @@ class classification:
         for config_use in self.config['GRU'].keys():
             n_fea = self.input_mt.shape[1]
             model = gru.GRU(self.device,config_use, n_fea,
-                                **self.config['GRU'][config_use]['config'])
+                                **self.config['GRU'][config_use]['config'],
+                                n_class=self.num_class)
             model.set_hidden_device(self.device)
             
             batch_size = self.config['GRU'][config_use]['batch_size']
@@ -297,7 +302,8 @@ class classification:
 
             n_fea = self.input_mt.shape[1]
             model = lstm.LSTM(self.device,config_use,n_fea,
-                                **self.config['LSTM'][config_use]['config'])
+                                **self.config['LSTM'][config_use]['config'],
+                                n_class=self.num_class)
             model.set_hidden_device(self.device)
             batch_size = self.config['LSTM'][config_use]['batch_size']
             
@@ -332,7 +338,8 @@ class classification:
 
             n_fea = self.input_mt.shape[1]
             model = rnn.RNN(self.device,config_use,n_fea,
-                                **self.config['RNN'][config_use]['config'])
+                                **self.config['RNN'][config_use]['config'],
+                                n_class=self.num_class)
             model.set_hidden_device(self.device)
             batch_size = self.config['RNN'][config_use]['batch_size']
             
